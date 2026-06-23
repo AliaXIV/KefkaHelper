@@ -46,15 +46,21 @@ public class MainWindow : Window, IDisposable
         foreach (var player in _blackholePartyData)
         {
             ImGui.PushID(player.PartyListIndex);
-            
+
             ImGui.Text(player.Name);
             ImGui.SameLine(120);
             ImGui.Text(player.MarkerAssignment.HasValue ? player.MarkerAssignment.Value.ToString() : "---");
             ImGui.SameLine(180);
             if (ImGui.SmallButton($"Mark"))
             {
-                plugin.MarkerManager.MarkPlayer(player.PartyListIndex, player.MarkerAssignment ?? MarkerType.Attack4);
+                Plugin.Framework.RunOnTick(() =>
+                {
+                    plugin.MarkerManager.MarkPlayer(
+                        player.PartyListIndex,
+                        player.MarkerAssignment ?? MarkerType.Attack4);
+                });
             }
+
             ImGui.PopID();
         }
 
@@ -65,7 +71,11 @@ public class MainWindow : Window, IDisposable
                                           .Select(e => (e.PartyListIndex, e.MarkerAssignment!.Value))
                                           .ToArray();
 
-            plugin.MarkerManager.MarkMultipleStaggered(list, 0.5f);
+            Plugin.Framework.RunOnTick(() =>
+            {
+                plugin.MarkerManager.MarkMultipleStaggered(list, 0.5f);
+            });
+            
         }
 
         ImGui.EndGroup();
@@ -87,14 +97,13 @@ public class MainWindow : Window, IDisposable
     {
         var result = new List<BlackholePartyEntry>();
         var markers = plugin.StatusProcessor.GetBlackholeMarkers();
-        for (var i = 0; i < Plugin.PartyList.Count; i++)
+
+        var partyList = Plugin.OrderedPartyList;
+
+        for (var i = 0; i < partyList.Count; i++)
         {
             Plugin.Log.Info($"checking player {i}");
-            var player = Plugin.PartyList[i];
-            if (player == null)
-            {
-                continue;
-            }
+            var player = partyList[i];
 
             Plugin.Log.Info($"player {i}, {player.Name}");
 
@@ -124,14 +133,12 @@ public class MainWindow : Window, IDisposable
             { 6, MarkerType.Ignore1 },
             { 7, MarkerType.Ignore2 },
         };
-        for (var i = 0; i < Plugin.PartyList.Count; i++)
+
+        var partyList = Plugin.OrderedPartyList;
+        for (var i = 0; i < partyList.Count; i++)
         {
             Plugin.Log.Info($"checking player {i}");
-            var player = Plugin.PartyList[i];
-            if (player == null)
-            {
-                continue;
-            }
+            var player = partyList[i];
 
             Plugin.Log.Info($"player {i}, {player.Name}");
             MarkerType? assignedMarker = markers[i];

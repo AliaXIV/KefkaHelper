@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.UI;
 
 namespace KefkaHelper;
 
@@ -10,14 +11,15 @@ public enum MarkerType
     Attack2,
     Attack3,
     Attack4,
+    Attack5,
+    Attack6,
+    Attack7,
+    Attack8,
     Bind1,
     Bind2,
     Bind3,
-    Bind4,
     Ignore1,
     Ignore2,
-    Ignore3,
-    Ignore4,
 }
 
 public class MarkerManager : IDisposable
@@ -36,12 +38,12 @@ public class MarkerManager : IDisposable
     public void MarkPlayer(int playerIdx, MarkerType marker)
     {
         Plugin.Log.Info($"marking player {playerIdx} with {marker}");
-        Plugin.ChatGui.Print($"/e mk {GetMarkerKey(marker)} <{playerIdx + 1}>");
+        CommandExecutor.ExecuteCommand($"/e /mk {GetMarkerKey(marker)} <{playerIdx + 1}>");
     }
 
     public void UnmarkPlayer(int playerIdx)
     {
-        Plugin.ChatGui.Print($"/e mk clear <{playerIdx + 1}>");
+        CommandExecutor.ExecuteCommand($"/e /mk clear <{playerIdx + 1}>");
     }
 
     private static string GetMarkerKey(MarkerType marker)
@@ -52,14 +54,15 @@ public class MarkerManager : IDisposable
             MarkerType.Attack2 => "attack2",
             MarkerType.Attack3 => "attack3",
             MarkerType.Attack4 => "attack4",
+            MarkerType.Attack5 => "attack5",
+            MarkerType.Attack6 => "attack6",
+            MarkerType.Attack7 => "attack7",
+            MarkerType.Attack8 => "attack8",
             MarkerType.Bind1 => "bind1",
             MarkerType.Bind2 => "bind2",
             MarkerType.Bind3 => "bind3",
-            MarkerType.Bind4 => "bind4",
             MarkerType.Ignore1 => "ignore1",
             MarkerType.Ignore2 => "ignore2",
-            MarkerType.Ignore3 => "ignore3",
-            MarkerType.Ignore4 => "ignore4",
             _ => throw new ArgumentOutOfRangeException(nameof(marker), marker, null)
         };
     }
@@ -68,9 +71,8 @@ public class MarkerManager : IDisposable
     {
         foreach (var (partyListIndex, markerType) in list)
         {
-            var delay = baseDelay + (Random.Shared.NextDouble() * 1.0f);
-            
-            ScheduleMark(partyListIndex, markerType, 1.0f);
+            var delay = (float)(baseDelay + (Random.Shared.NextDouble() * 1.0f));
+            ScheduleMark(partyListIndex, markerType, delay);
         }
     }
 
@@ -93,11 +95,11 @@ public class MarkerManager : IDisposable
             _isSchedulerActive = false;
             return;
         }
-        
+
         _currentTimer += framework.UpdateDelta;
 
         var scheduled = _scheduledMarkers.Peek();
-        if (scheduled.delay > _currentTimer)
+        if (_currentTimer > scheduled.delay)
         {
             _currentTimer = TimeSpan.Zero;
             MarkPlayer(scheduled.partyListIndex, scheduled.marker);

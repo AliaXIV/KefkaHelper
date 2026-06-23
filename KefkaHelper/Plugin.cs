@@ -1,13 +1,15 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using Dalamud.Game.Command;
 using Dalamud.IoC;
 using Dalamud.Plugin;
-using System.IO;
+using System.Linq;
+using Dalamud.Game.ClientState.Party;
 using Dalamud.Game.ClientState.Statuses;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using FFXIVClientStructs.FFXIV.Client.Game;
+using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using KefkaHelper.Windows;
 
 namespace KefkaHelper;
@@ -37,13 +39,24 @@ public sealed class Plugin : IDalamudPlugin
 
     [PluginService]
     internal static IChatGui ChatGui { get; private set; } = null!;
+
+    [PluginService]
+    public static ISigScanner SigScanner { get; private set; }
     
+    [PluginService]
+    internal static IGameGui GameGui { get; private set; } = null!;
+
     [PluginService]
     internal static IFramework Framework { get; private set; } = null!;
 
     [PluginService]
     internal static IPluginLog Log { get; private set; } = null!;
 
+    
+    [PluginService]
+    internal static IGameInteropProvider GameInteropProvider { get; private set; } = null!;
+
+    
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("KefkaHelper");
@@ -53,12 +66,17 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandName = "/kefkahelper";
 
     public readonly StatusProcessor StatusProcessor = new();
-    public readonly MarkerManager MarkerManager = new(); 
+    public readonly MarkerManager MarkerManager = new();
+    
+    public static List<IPartyMember> OrderedPartyList => GetOrderedPartyList();
     
     public Plugin()
     {
+
+        GameInteropProvider.InitializeFromAttributes(new CommandExecutor());
+
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-        
+
         ConfigWindow = new ConfigWindow(this);
         MainWindow = new MainWindow(this);
 
@@ -68,7 +86,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand));
 
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
-        
+
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
     }
@@ -86,7 +104,7 @@ public sealed class Plugin : IDalamudPlugin
 
         StatusProcessor.Dispose();
         MarkerManager.Dispose();
-        
+
         CommandManager.RemoveHandler(CommandName);
     }
 
@@ -106,16 +124,12 @@ public sealed class Plugin : IDalamudPlugin
             Log.Info($"Self status: {status.GameData.Value.Name.ToString()} {status.StatusId}");
         }
 
-        Log.Info($"Party list count: {PartyList.Length}");
+        var partyList = OrderedPartyList;
 
-        for (var i = 0; i < PartyList.Length; i++)
+        Log.Info($"Party list count: {partyList.Count}");
+        
+        foreach (var entry in partyList)
         {
-            var entry = PartyList[i];
-            if (entry == null)
-            {
-                continue;
-            }
-
             foreach (var status in entry.Statuses)
             {
                 Log.Info(
@@ -124,10 +138,40 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    private static List<IPartyMember> GetOrderedPartyList()
+    {
+        return PartyList
+               .OrderBy(e => GetPartySlot(e.Name.ToString()))
+               .ToList();
+    }
 
-    private unsafe StatusList GetLocalStatuses()
+    private static unsafe StatusList GetLocalStatuses()
     {
         var character = Control.Instance()->LocalPlayer;
         return StatusList.CreateStatusListReference((nint)character->GetStatusManager())!;
     }
+
+    private static unsafe int GetPartySlot(string playerName)
+    {
+        var addon = GameGui.GetAddonByName<AddonPartyList>("_PartyList");
+        if (addon == null || !addon->IsVisible)
+        {
+            Log.Info($"Addon not visible");
+            return 0;
+        }
+
+        for (var i = 0; i < addon->PartyMembers.Length; i++)
+        {
+            var partyMember = addon->PartyMembers[i];
+            var name = partyMember.Name->NodeText.ExtractText();
+            Log.Info($"Name: '{name}' '{playerName}'");
+            if (name.Contains(playerName))
+            {
+                return i + 1;
+            }
+        }
+        return 0;
+    }
+    
+    
 }

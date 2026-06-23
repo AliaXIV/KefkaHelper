@@ -26,8 +26,12 @@ public class StatusProcessor : IDisposable
     private void Update(IFramework framework)
     {
         // in update we only check local player and 
+        
+        
     }
 
+    // private void Check
+    
     public Dictionary<int, MarkerType> GetBlackholeMarkers()
     {
         const int firstInLineId = 3004;
@@ -37,14 +41,11 @@ public class StatusProcessor : IDisposable
         const int primordialCrustId = 5454;
         
         var result = new Dictionary<int, MarkerType>();
-
-        for (var partyListIdx = 0; partyListIdx < Plugin.PartyList.Length; partyListIdx++)
+        var partyList = Plugin.OrderedPartyList;
+        
+        for (var partyListIdx = 0; partyListIdx < partyList.Count; partyListIdx++)
         {
-            var player = Plugin.PartyList[partyListIdx];
-            if (player == null)
-            {
-                continue;
-            }
+            var player = partyList[partyListIdx];
 
             if (player.Statuses.Any(s => s.StatusId == firstInLineId))
             {
@@ -66,7 +67,7 @@ public class StatusProcessor : IDisposable
     {
         return player.ClassJob.Value.JobType is 1 or 2 or 6;
     }
-
+    
     private unsafe StatusList GetLocalStatuses()
     {
         var character = Control.Instance()->LocalPlayer;
