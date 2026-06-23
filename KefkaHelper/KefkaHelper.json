@@ -1,0 +1,12 @@
+{
+  "Author": "AliaXIV",
+  "Name": "Kefka Helper",
+  "Punchline": "Helper plugin assisting with some of DMU/UMAD/Kefka Ultimate mechanics",
+  "Description": "TBA",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "ultimate",
+    "dmu",
+    "umad"
+  ]
+}
