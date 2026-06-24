@@ -38,12 +38,12 @@ public class MarkerManager : IDisposable
     public void MarkPlayer(int playerIdx, MarkerType marker)
     {
         Plugin.Log.Info($"marking player {playerIdx} with {marker}");
-        CommandExecutor.ExecuteCommand($"/e /mk {GetMarkerKey(marker)} <{playerIdx + 1}>");
+        CommandExecutor.ExecuteCommand($"/mk {GetMarkerKey(marker)} <{playerIdx + 1}>");
     }
 
     public void UnmarkPlayer(int playerIdx)
     {
-        CommandExecutor.ExecuteCommand($"/e /mk clear <{playerIdx + 1}>");
+        CommandExecutor.ExecuteCommand($"/mk clear <{playerIdx + 1}>");
     }
 
     private static string GetMarkerKey(MarkerType marker)
@@ -71,7 +71,7 @@ public class MarkerManager : IDisposable
     {
         foreach (var (partyListIndex, markerType) in list)
         {
-            var delay = (float)(baseDelay + (Random.Shared.NextDouble() * 1.0f));
+            var delay = (float)(baseDelay + (Random.Shared.NextDouble() * 0.5f));
             ScheduleMark(partyListIndex, markerType, delay);
         }
     }

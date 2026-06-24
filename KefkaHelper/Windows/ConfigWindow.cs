@@ -8,14 +8,13 @@ namespace KefkaHelper.Windows;
 public class ConfigWindow : Window, IDisposable
 {
     private readonly Configuration configuration;
-    
+    private readonly Plugin _plugin;
+
     public ConfigWindow(Plugin plugin) : base("Kefka Helper Configuration ###KefkaConfig")
     {
-        Flags = ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar |
-                ImGuiWindowFlags.NoScrollWithMouse;
+        _plugin = plugin;
 
-        Size = new Vector2(100, 100);
-        SizeCondition = ImGuiCond.Always;
+        Size = new Vector2(300, 100);
         configuration = plugin.Configuration;
     }
 
@@ -23,20 +22,26 @@ public class ConfigWindow : Window, IDisposable
 
     public override void Draw()
     {
-        // Can't ref a property, so use a local copy
-        // var configValue = configuration.SomePropertyToBeSavedAndWithADefault;
-        // if (ImGui.Checkbox("Random Config Bool", ref configValue))
-        // {
-        //     configuration.SomePropertyToBeSavedAndWithADefault = configValue;
-        //     // Can save immediately on change if you don't want to provide a "Save and Close" button
-        //     configuration.Save();
-        // }
-        //
-        // var movable = configuration.IsConfigWindowMovable;
-        // if (ImGui.Checkbox("Movable Config Window", ref movable))
-        // {
-        //     configuration.IsConfigWindowMovable = movable;
-        //     configuration.Save();
-        // }
+        var configValue = configuration.IsDisplayForsakenDebuffs;
+        if (ImGui.Checkbox("Forsaken Debuff Monitoring", ref configValue))
+        {
+            configuration.IsDisplayForsakenDebuffs = configValue;
+            configuration.Save();
+        }
+
+        ImGui.Spacing();
+        if (ImGui.SmallButton("Toggle Forsaken Preview"))
+        {
+            if (_plugin.ForsakenWindow.IsOpen)
+            {
+                _plugin.ForsakenWindow.IsOpen = false;
+                _plugin.ForsakenWindow.IsPreview = false;
+            }
+            else
+            {
+                _plugin.ForsakenWindow.IsOpen = true;
+                _plugin.ForsakenWindow.IsPreview = true;
+            }
+        }
     }
 }
