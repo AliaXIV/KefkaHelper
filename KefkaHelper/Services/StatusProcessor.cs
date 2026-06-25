@@ -6,9 +6,8 @@ using Dalamud.Game.ClientState.Party;
 using Dalamud.Game.ClientState.Statuses;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
-using Serilog;
 
-namespace KefkaHelper;
+namespace KefkaHelper.Services;
 
 // 1. we want to watch for the forsaken debuff and attach new status that represents the stored debuff
 // 2. we want to check for valid blackhole statuses and create waymark suggestions
@@ -95,7 +94,7 @@ public class StatusProcessor : IDisposable
         }
     }
     
-    public Dictionary<int, MarkerType> GetBlackholeMarkers()
+    public Dictionary<int, PlayerMarker> GetBlackholeMarkers()
     {
         const int firstInLineId = 3004;
         const int secondInLineId = 3005;
@@ -103,7 +102,7 @@ public class StatusProcessor : IDisposable
         const int accretionId = 1604;
         const int primordialCrustId = 5454;
         
-        var result = new Dictionary<int, MarkerType>();
+        var result = new Dictionary<int, PlayerMarker>();
         var partyList = Plugin.OrderedPartyList;
         
         for (var partyListIdx = 0; partyListIdx < partyList.Count; partyListIdx++)
@@ -112,15 +111,15 @@ public class StatusProcessor : IDisposable
 
             if (player.Statuses.Any(s => s.StatusId == firstInLineId))
             {
-                result[partyListIdx] = player.Statuses.Any(s => s.StatusId == accretionId) ? MarkerType.Ignore1 :
-                                       IsSupport(player) ? MarkerType.Bind1 : MarkerType.Attack1;
+                result[partyListIdx] = player.Statuses.Any(s => s.StatusId == accretionId) ? PlayerMarker.Ignore1 :
+                                       IsSupport(player) ? PlayerMarker.Bind1 : PlayerMarker.Attack1;
             } else if (player.Statuses.Any(s => s.StatusId == secondInLineId))
             {
-                result[partyListIdx] = player.Statuses.Any(s => s.StatusId == accretionId) ? MarkerType.Ignore2 :
-                                       IsSupport(player) ? MarkerType.Bind2 : MarkerType.Attack2;
+                result[partyListIdx] = player.Statuses.Any(s => s.StatusId == accretionId) ? PlayerMarker.Ignore2 :
+                                       IsSupport(player) ? PlayerMarker.Bind2 : PlayerMarker.Attack2;
             } else if (player.Statuses.Any(s => s.StatusId == thirdInLineId))
             {
-                result[partyListIdx] = IsSupport(player) ? MarkerType.Bind3 : MarkerType.Attack3;
+                result[partyListIdx] = IsSupport(player) ? PlayerMarker.Bind3 : PlayerMarker.Attack3;
             }
         }
         return result;

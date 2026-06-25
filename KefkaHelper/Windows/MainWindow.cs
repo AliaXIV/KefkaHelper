@@ -4,16 +4,17 @@ using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using KefkaHelper.Services;
 
 namespace KefkaHelper.Windows;
 
 public class MainWindow : Window, IDisposable
 {
-    private struct BlackholePartyEntry(int partyListIndex, string name, MarkerType? markerAssignment)
+    private struct BlackholePartyEntry(int partyListIndex, string name, PlayerMarker? markerAssignment)
     {
         public int PartyListIndex = partyListIndex;
         public string Name = name;
-        public MarkerType? MarkerAssignment = markerAssignment;
+        public PlayerMarker? MarkerAssignment = markerAssignment;
     }
 
     private readonly Plugin plugin;
@@ -55,9 +56,9 @@ public class MainWindow : Window, IDisposable
             {
                 Plugin.Framework.RunOnTick(() =>
                 {
-                    plugin.MarkerManager.MarkPlayer(
+                    MarkerManager.MarkPlayer(
                         player.PartyListIndex,
-                        player.MarkerAssignment ?? MarkerType.Attack4);
+                        player.MarkerAssignment ?? PlayerMarker.Attack4);
                 });
             }
 
@@ -107,7 +108,7 @@ public class MainWindow : Window, IDisposable
 
             Plugin.Log.Info($"player {i}, {player.Name}");
 
-            MarkerType? assignedMarker = null;
+            PlayerMarker? assignedMarker = null;
             if (markers.TryGetValue(i, out var marker))
             {
                 assignedMarker = marker;
@@ -122,16 +123,16 @@ public class MainWindow : Window, IDisposable
     private void DebugBlackhole()
     {
         var result = new List<BlackholePartyEntry>();
-        var markers = new Dictionary<int, MarkerType>()
+        var markers = new Dictionary<int, PlayerMarker>()
         {
-            { 0, MarkerType.Attack1 },
-            { 1, MarkerType.Attack2 },
-            { 2, MarkerType.Attack3 },
-            { 3, MarkerType.Bind1 },
-            { 4, MarkerType.Bind2 },
-            { 5, MarkerType.Bind3 },
-            { 6, MarkerType.Ignore1 },
-            { 7, MarkerType.Ignore2 },
+            { 0, PlayerMarker.Attack1 },
+            { 1, PlayerMarker.Attack2 },
+            { 2, PlayerMarker.Attack3 },
+            { 3, PlayerMarker.Bind1 },
+            { 4, PlayerMarker.Bind2 },
+            { 5, PlayerMarker.Bind3 },
+            { 6, PlayerMarker.Ignore1 },
+            { 7, PlayerMarker.Ignore2 },
         };
 
         var partyList = Plugin.OrderedPartyList;
@@ -141,7 +142,7 @@ public class MainWindow : Window, IDisposable
             var player = partyList[i];
 
             Plugin.Log.Info($"player {i}, {player.Name}");
-            MarkerType? assignedMarker = markers[i];
+            PlayerMarker? assignedMarker = markers[i];
             result.Add(new BlackholePartyEntry(i, player.Name.ToString(), assignedMarker));
         }
 

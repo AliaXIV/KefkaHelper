@@ -10,11 +10,11 @@ public class Configuration : IPluginConfiguration
 
     public bool IsDisplayForsakenDebuffs { get; set; } = true;
 
-    public event Action Changed; 
+    public event Action? OnChanged;
     
     public void Save()
     {
         Plugin.PluginInterface.SavePluginConfig(this);
-        Changed?.Invoke();
+        OnChanged?.Invoke();
     }
 }

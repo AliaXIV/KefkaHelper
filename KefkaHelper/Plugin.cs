@@ -1,10 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Dalamud.Game.Command;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using System.Linq;
-using Dalamud.Game.ClientState.Objects.Enums;
-using Dalamud.Game.ClientState.Objects.Types;
+using System.Text;
 using Dalamud.Game.ClientState.Party;
 using Dalamud.Game.ClientState.Statuses;
 using Dalamud.Interface.Windowing;
@@ -13,71 +13,79 @@ using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using KefkaHelper.Windows;
-using Lumina.Excel.Sheets;
+using KefkaHelper.Services;
 
 namespace KefkaHelper;
 
+// ReSharper disable once ClassNeverInstantiated.Global
 public sealed class Plugin : IDalamudPlugin
 {
     [PluginService]
     internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
-
     [PluginService]
     internal static ITextureProvider TextureProvider { get; private set; } = null!;
-
     [PluginService]
     internal static ICommandManager CommandManager { get; private set; } = null!;
-    
     [PluginService]
     internal static IDataManager DataManager { get; private set; } = null!;
-    
     [PluginService]
     internal static IPartyList PartyList { get; private set; } = null!;
-
     [PluginService]
     internal static IChatGui ChatGui { get; private set; } = null!;
-
     [PluginService]
     public static IObjectTable ObjectTable { get; private set; } = null!;
-    
     [PluginService]
     internal static IGameGui GameGui { get; private set; } = null!;
-
     [PluginService]
     internal static IFramework Framework { get; private set; } = null!;
-
     [PluginService]
     internal static IPluginLog Log { get; private set; } = null!;
-
-    
     [PluginService]
     internal static IGameInteropProvider GameInteropProvider { get; private set; } = null!;
 
-    
+
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("KefkaHelper");
     private ConfigWindow ConfigWindow { get; init; }
     private MainWindow MainWindow { get; init; }
     public ForsakenWindow ForsakenWindow { get; init; }
-    
+
     private const string CommandName = "/kefkahelper";
 
     public readonly StatusProcessor StatusProcessor;
     public readonly MarkerManager MarkerManager = new();
-    
+
     public static List<IPartyMember> OrderedPartyList => GetOrderedPartyList();
-    
+
+    private static readonly Dictionary<string, int> PartyOrderSymbolMapping = new()
+    {
+        {"E090", 1},
+        {"E091", 2},
+        {"E092", 3},
+        {"E093", 4},
+        {"E094", 5},
+        {"E095", 6},
+        {"E096", 7},
+        {"E097", 8},
+        {"E0E0", 1},
+        {"E0E1", 2},
+        {"E0E2", 3},
+        {"E0E3", 4},
+        {"E0E4", 5},
+        {"E0E5", 6},
+        {"E0E6", 7},
+        {"E0E7", 8},
+    };
+
     public Plugin()
     {
-
-        GameInteropProvider.InitializeFromAttributes(new CommandExecutor());
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         ConfigWindow = new ConfigWindow(this);
         MainWindow = new MainWindow(this);
         ForsakenWindow = new ForsakenWindow(this);
-        
+
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(MainWindow);
         WindowSystem.AddWindow(ForsakenWindow);
@@ -87,11 +95,10 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
-        
+
         StatusProcessor = new StatusProcessor(this);
         StatusProcessor.SetForsakenEnabled(Configuration.IsDisplayForsakenDebuffs);
-        Configuration.Changed += ConfigurationOnChanged;
-        
+        Configuration.OnChanged += ConfigurationOnChanged;
     }
 
     private void ConfigurationOnChanged()
@@ -110,7 +117,7 @@ public sealed class Plugin : IDalamudPlugin
         ConfigWindow.Dispose();
         MainWindow.Dispose();
         ForsakenWindow.Dispose();
-        
+
         StatusProcessor.Dispose();
         MarkerManager.Dispose();
 
@@ -125,7 +132,7 @@ public sealed class Plugin : IDalamudPlugin
     public void ToggleConfigUi() => ConfigWindow.Toggle();
     public void ToggleMainUi() => MainWindow.Toggle();
 
-    public void LogDebuffStatuses()
+    public unsafe void LogDebuffStatuses()
     {
         var localStatuses = GetLocalStatuses();
         foreach (var status in localStatuses)
@@ -136,7 +143,7 @@ public sealed class Plugin : IDalamudPlugin
         var partyList = OrderedPartyList;
 
         Log.Info($"Party list count: {partyList.Count}");
-        
+
         foreach (var entry in partyList)
         {
             foreach (var status in entry.Statuses)
@@ -169,27 +176,26 @@ public sealed class Plugin : IDalamudPlugin
             return 0;
         }
 
-        foreach (var partyMember in addon->PartyMembers)
+        var members = addon->PartyMembers.ToArray().OrderBy(p =>
         {
-            Log.Info(string.Join("\n", partyMember.Name->NodeText.ExtractText()));
-        }
-        
-        for (var i = 0; i < addon->PartyMembers.Length; i++)
+            var bytes = Encoding.BigEndianUnicode.GetBytes(p.GroupSlotIndicator->NodeText.ExtractText());
+            var charStr = Convert.ToHexString(bytes);
+            return PartyOrderSymbolMapping.GetValueOrDefault(charStr, -1);
+        }).ToArray();
+
+
+
+        for (var i = 0; i < members.Length; i++)
         {
-            var partyMember = addon->PartyMembers[i];
+            var partyMember = members[i];
             var name = partyMember.Name->NodeText.ExtractText();
-            name = string.Join(" ", name.Split(" ").Skip(1).ToArray());
-            if (name.EndsWith("..."))
-            {
-                name = name.TrimEnd('.');
-            }
-            Log.Info($"Name: '{name}' '{playerName}' {playerName.Contains(name)}");
+            name = string.Join(" ", name.Split(" ").Skip(1).ToArray()).TrimEnd('.');
             if (playerName.Contains(name))
             {
-                Log.Info($"Found: '{playerName}' {i}");
                 return i + 1;
             }
         }
+
         Log.Warning($"Could not find: '{playerName}'");
         return 0;
     }
