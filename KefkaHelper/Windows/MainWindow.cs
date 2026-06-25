@@ -97,7 +97,7 @@ public class MainWindow : Window, IDisposable
     private void CheckForBlackhole()
     {
         var result = new List<BlackholePartyEntry>();
-        var markers = plugin.StatusProcessor.GetBlackholeMarkers();
+        var markers = plugin.KefkaProcessor.GetBlackholeMarkers();
 
         var partyList = Plugin.OrderedPartyList;
 

@@ -12,8 +12,10 @@ using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Info;
 using KefkaHelper.Windows;
 using KefkaHelper.Services;
+using Action = Lumina.Excel.Sheets.Action;
 
 namespace KefkaHelper;
 
@@ -53,8 +55,9 @@ public sealed class Plugin : IDalamudPlugin
 
     private const string CommandName = "/kefkahelper";
 
-    public readonly StatusProcessor StatusProcessor;
+    public readonly KefkaProcessor KefkaProcessor;
     public readonly MarkerManager MarkerManager = new();
+    public readonly BattleProcessor BattleProcessor;
 
     public static List<IPartyMember> OrderedPartyList => GetOrderedPartyList();
 
@@ -96,14 +99,18 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
-        StatusProcessor = new StatusProcessor(this);
-        StatusProcessor.SetForsakenEnabled(Configuration.IsDisplayForsakenDebuffs);
+        BattleProcessor = new BattleProcessor();
+        
+        KefkaProcessor = new KefkaProcessor(this);
+        KefkaProcessor.SetForsakenEnabled(Configuration.IsDisplayForsakenDebuffs);
+
+        
         Configuration.OnChanged += ConfigurationOnChanged;
     }
 
     private void ConfigurationOnChanged()
     {
-        StatusProcessor.SetForsakenEnabled(Configuration.IsDisplayForsakenDebuffs);
+        KefkaProcessor.SetForsakenEnabled(Configuration.IsDisplayForsakenDebuffs);
     }
 
     public void Dispose()
@@ -118,9 +125,10 @@ public sealed class Plugin : IDalamudPlugin
         MainWindow.Dispose();
         ForsakenWindow.Dispose();
 
-        StatusProcessor.Dispose();
+        KefkaProcessor.Dispose();
         MarkerManager.Dispose();
-
+        BattleProcessor.Dispose();
+        
         CommandManager.RemoveHandler(CommandName);
     }
 
@@ -134,6 +142,12 @@ public sealed class Plugin : IDalamudPlugin
 
     public unsafe void LogDebuffStatuses()
     {
+        // var info = InfoProxyPartyMember.Instance();
+        // foreach (var characterData in info->CharDataSpan)
+        // {
+        //     Log.Info($"name: {characterData.NameString} sort: {characterData.Sort}  {characterData}");
+        // }
+        
         var localStatuses = GetLocalStatuses();
         foreach (var status in localStatuses)
         {
