@@ -31,9 +31,15 @@ public class MainWindow : Window, IDisposable
         // Size = new Vector2(300, 300);
 
         this.plugin = plugin;
+
+        plugin.KefkaProcessor.OnBlackholeMarkersUpdated += OnBlackholeMarkersUpdated;
     }
 
-    public void Dispose() { }
+
+    public void Dispose()
+    {
+        plugin.KefkaProcessor.OnBlackholeMarkersUpdated -= OnBlackholeMarkersUpdated;
+    }
 
     public override void Draw()
     {
@@ -76,8 +82,22 @@ public class MainWindow : Window, IDisposable
             {
                 plugin.MarkerManager.MarkMultipleStaggered(list, 0.5f);
             });
-            
+
         }
+        if (ImGui.Button("Mark Accretion"))
+        {
+            var list = _blackholePartyData
+                       .Where(e => e.MarkerAssignment.HasValue)
+                       .Select(e => (e.PartyListIndex, e.MarkerAssignment!.Value))
+                       .Where(pair => pair.Value is PlayerMarker.Ignore1 or PlayerMarker.Ignore2)
+                       .ToArray();
+            Plugin.Framework.RunOnTick(() =>
+            {
+                plugin.MarkerManager.MarkMultipleStaggered(list, 0.5f);
+            });
+
+        }
+
 
         ImGui.EndGroup();
 
@@ -96,11 +116,36 @@ public class MainWindow : Window, IDisposable
 
     private void CheckForBlackhole()
     {
-        var result = new List<BlackholePartyEntry>();
         var markers = plugin.KefkaProcessor.GetBlackholeMarkers();
+        UpdateBlackholeMarkers(markers);
+    }
+
+    private void DebugBlackhole()
+    {
+        var markers = new Dictionary<int, PlayerMarker>()
+        {
+            {0, PlayerMarker.Attack1},
+            {1, PlayerMarker.Attack2},
+            {2, PlayerMarker.Attack3},
+            {3, PlayerMarker.Bind1},
+            {4, PlayerMarker.Bind2},
+            {5, PlayerMarker.Bind3},
+            {6, PlayerMarker.Ignore1},
+            {7, PlayerMarker.Ignore2},
+        };
+        UpdateBlackholeMarkers(markers);
+    }
+
+    private void OnBlackholeMarkersUpdated(Dictionary<int, PlayerMarker> markers)
+    {
+        UpdateBlackholeMarkers(markers);
+    }
+
+    private void UpdateBlackholeMarkers(Dictionary<int, PlayerMarker> markers)
+    {
+        var result = new List<BlackholePartyEntry>();
 
         var partyList = Plugin.OrderedPartyList;
-
         for (var i = 0; i < partyList.Count; i++)
         {
             Plugin.Log.Info($"checking player {i}");
@@ -113,36 +158,6 @@ public class MainWindow : Window, IDisposable
             {
                 assignedMarker = marker;
             }
-
-            result.Add(new BlackholePartyEntry(i, player.Name.ToString(), assignedMarker));
-        }
-
-        _blackholePartyData = result;
-    }
-
-    private void DebugBlackhole()
-    {
-        var result = new List<BlackholePartyEntry>();
-        var markers = new Dictionary<int, PlayerMarker>()
-        {
-            { 0, PlayerMarker.Attack1 },
-            { 1, PlayerMarker.Attack2 },
-            { 2, PlayerMarker.Attack3 },
-            { 3, PlayerMarker.Bind1 },
-            { 4, PlayerMarker.Bind2 },
-            { 5, PlayerMarker.Bind3 },
-            { 6, PlayerMarker.Ignore1 },
-            { 7, PlayerMarker.Ignore2 },
-        };
-
-        var partyList = Plugin.OrderedPartyList;
-        for (var i = 0; i < partyList.Count; i++)
-        {
-            Plugin.Log.Info($"checking player {i}");
-            var player = partyList[i];
-
-            Plugin.Log.Info($"player {i}, {player.Name}");
-            PlayerMarker? assignedMarker = markers[i];
             result.Add(new BlackholePartyEntry(i, player.Name.ToString(), assignedMarker));
         }
 

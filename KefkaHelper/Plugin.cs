@@ -85,6 +85,10 @@ public sealed class Plugin : IDalamudPlugin
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
+        BattleProcessor = new BattleProcessor();
+        KefkaProcessor = new KefkaProcessor(this);
+        KefkaProcessor.SetForsakenEnabled(Configuration.IsDisplayForsakenDebuffs);
+        
         ConfigWindow = new ConfigWindow(this);
         MainWindow = new MainWindow(this);
         ForsakenWindow = new ForsakenWindow(this);
@@ -98,12 +102,6 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
-
-        BattleProcessor = new BattleProcessor();
-        
-        KefkaProcessor = new KefkaProcessor(this);
-        KefkaProcessor.SetForsakenEnabled(Configuration.IsDisplayForsakenDebuffs);
-
         
         Configuration.OnChanged += ConfigurationOnChanged;
     }

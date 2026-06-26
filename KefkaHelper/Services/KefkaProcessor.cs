@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.ClientState.Party;
 using Dalamud.Game.ClientState.Statuses;
@@ -28,6 +29,9 @@ public class KefkaProcessor : IDisposable
 {
     private const uint ActionIdFutureEnd = 47826;
     private const uint ActionIdPastEnd = 47827;
+    private const uint ActionIdEarthquake1 = 50545;
+    private const uint ActionIdEarthquake2 = 50546;
+
 
     private const int StatusIdForsakenStack = 5084;
     private const int StatusIdForsakenCircle = 5085;
@@ -35,19 +39,23 @@ public class KefkaProcessor : IDisposable
 
     private const uint NpcBaseIdKefkaP2 = 19506;
     private const uint NpcBaseIdKefkaP2Clone = 19513;
+
+    public Dictionary<int, PlayerMarker>? CachedBlackholeMarkers;
+    public event Action<Dictionary<int, PlayerMarker>> OnBlackholeMarkersUpdated;
     
     private Plugin _plugin;
     private ExcelSheet<Lumina.Excel.Sheets.Action> _actionSheet;
-    
-    
+    private List<(DateTime when, Action handler)> _scheduledActions = new();
+
+
     public bool IsForsakenEnabled { get; private set; }
 
     public KefkaProcessor(Plugin plugin)
     {
         _plugin = plugin;
         _actionSheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>();
-        
-        
+
+
         Plugin.Framework.Update += Update;
         _plugin.BattleProcessor.OnActorCast += HandleActorCast;
     }
@@ -61,6 +69,17 @@ public class KefkaProcessor : IDisposable
 
     private void Update(IFramework framework)
     {
+        var now = DateTime.UtcNow;
+        for (var i = _scheduledActions.Count - 1; i >= 0; i--)
+        {
+            var action = _scheduledActions[i];
+            if (now > action.when)
+            {
+                action.handler.Invoke();
+                _scheduledActions.RemoveAt(i);
+            }
+        }
+
         if (IsForsakenEnabled)
         {
             CheckForsaken();
@@ -69,6 +88,14 @@ public class KefkaProcessor : IDisposable
 
     private void HandleActorCast(uint sourceId, ActorCastPacket data)
     {
+
+        var obj = Plugin.ObjectTable.SearchById(sourceId);
+        if (obj is {ObjectKind: ObjectKind.BattleNpc})
+        {
+            Plugin.Log.Info(
+                $"[cast] {obj.Name.TextValue} {_actionSheet.GetRow(data.ActionId).Name.ExtractText()} sourceBaseId: {obj.BaseId} castId: {data.ActionId} castTime: {data.CastTime}");
+        }
+
         if (IsForsakenEnabled)
         {
             if (data.ActionId is ActionIdPastEnd or ActionIdFutureEnd)
@@ -76,19 +103,29 @@ public class KefkaProcessor : IDisposable
                 var action = _actionSheet.GetRow(data.ActionId);
                 _plugin.ForsakenWindow.LastEndCastId = data.ActionId;
 
-                var message = new SeStringBuilder().PushColorRgba(new Vector4(0.9f, 0.1f, 0.8f, 1.0f)).Append(action.Name).PopColor().ToReadOnlySeString();
+                var message = new SeStringBuilder()
+                              .PushColorRgba(new Vector4(0.9f, 0.1f, 0.8f, 1.0f))
+                              .Append(action.Name)
+                              .PopColor()
+                              .ToReadOnlySeString();
                 Plugin.ChatGui.Print(message);
             }
-            // var p2KefkaGameObject = Plugin.ObjectTable.FirstOrDefault(o => o.BaseId == p2KefkaBaseId);
-            // if (p2KefkaGameObject is IBattleNpc npc)
-            // {
-            //     if (npc is { IsCasting: true, CastActionId: ActionIdFutureEnd or ActionIdPastEnd })
-            //     {
-            //         _plugin.ForsakenWindow.LastEndCastId = npc.CastActionId;
-            //     }
-            // }
+        }
+
+        if (data.ActionId == ActionIdEarthquake1)
+        {
+            DoAfter(
+                data.CastTime + 5.0f,
+                () =>
+                {
+                    CachedBlackholeMarkers = GetBlackholeMarkers();
+                    OnBlackholeMarkersUpdated?.Invoke(CachedBlackholeMarkers);
+                    Plugin.ChatGui.Print("Blackhole ready");
+                    Plugin.Log.Info("Blackhole ready");
+                });
         }
     }
+
 
     private void CheckForsaken()
     {
@@ -170,5 +207,11 @@ public class KefkaProcessor : IDisposable
     {
 
         IsForsakenEnabled = enabled;
+    }
+
+    private void DoAfter(float after, Action action)
+    {
+        var when = DateTime.UtcNow.AddSeconds(after);
+        _scheduledActions.Add((when, action));
     }
 }
