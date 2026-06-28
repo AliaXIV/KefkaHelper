@@ -87,8 +87,7 @@ public sealed class Plugin : IDalamudPlugin
 
         BattleProcessor = new BattleProcessor();
         KefkaProcessor = new KefkaProcessor(this);
-        KefkaProcessor.SetForsakenEnabled(Configuration.IsDisplayForsakenDebuffs);
-        
+
         ConfigWindow = new ConfigWindow(this);
         MainWindow = new MainWindow(this);
         ForsakenWindow = new ForsakenWindow(this);
@@ -102,8 +101,9 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
-        
+
         Configuration.OnChanged += ConfigurationOnChanged;
+        ConfigurationOnChanged();
     }
 
     private void ConfigurationOnChanged()
@@ -126,7 +126,7 @@ public sealed class Plugin : IDalamudPlugin
         KefkaProcessor.Dispose();
         MarkerManager.Dispose();
         BattleProcessor.Dispose();
-        
+
         CommandManager.RemoveHandler(CommandName);
     }
 
@@ -137,78 +137,19 @@ public sealed class Plugin : IDalamudPlugin
 
     public void ToggleConfigUi() => ConfigWindow.Toggle();
     public void ToggleMainUi() => MainWindow.Toggle();
-
-    public unsafe void LogDebuffStatuses()
-    {
-        // var info = InfoProxyPartyMember.Instance();
-        // foreach (var characterData in info->CharDataSpan)
-        // {
-        //     Log.Info($"name: {characterData.NameString} sort: {characterData.Sort}  {characterData}");
-        // }
-        
-        var localStatuses = GetLocalStatuses();
-        foreach (var status in localStatuses)
-        {
-            Log.Info($"Self status: {status.GameData.Value.Name.ToString()} {status.StatusId}");
-        }
-
-        var partyList = OrderedPartyList;
-
-        Log.Info($"Party list count: {partyList.Count}");
-
-        foreach (var entry in partyList)
-        {
-            foreach (var status in entry.Statuses)
-            {
-                Log.Info(
-                    $"Party member {entry.Name} status: {status.GameData.Value.Name.ToString()} {status.StatusId}");
-            }
-        }
-    }
+    
 
     private static List<IPartyMember> GetOrderedPartyList()
     {
-        return PartyList
-               .OrderBy(e => GetPartySlot(e.Name.ToString()))
-               .ToList();
+        return PartyListResolver.GetPartyListSnapshot()
+                                .OrderBy(e => e.Slot)
+                                .Select(e => e.Member)
+                                .ToList();
     }
 
     private static unsafe StatusList GetLocalStatuses()
     {
         var character = Control.Instance()->LocalPlayer;
         return StatusList.CreateStatusListReference((nint)character->GetStatusManager())!;
-    }
-
-    private static unsafe int GetPartySlot(string playerName)
-    {
-        var addon = GameGui.GetAddonByName<AddonPartyList>("_PartyList");
-        if (addon == null || !addon->IsVisible)
-        {
-            Log.Info($"Addon not visible");
-            return 0;
-        }
-
-        var members = addon->PartyMembers.ToArray().OrderBy(p =>
-        {
-            var bytes = Encoding.BigEndianUnicode.GetBytes(p.GroupSlotIndicator->NodeText.ExtractText());
-            var charStr = Convert.ToHexString(bytes);
-            return PartyOrderSymbolMapping.GetValueOrDefault(charStr, -1);
-        }).ToArray();
-
-
-
-        for (var i = 0; i < members.Length; i++)
-        {
-            var partyMember = members[i];
-            var name = partyMember.Name->NodeText.ExtractText();
-            name = string.Join(" ", name.Split(" ").Skip(1).ToArray()).TrimEnd('.');
-            if (playerName.Contains(name))
-            {
-                return i + 1;
-            }
-        }
-
-        Log.Warning($"Could not find: '{playerName}'");
-        return 0;
     }
 }

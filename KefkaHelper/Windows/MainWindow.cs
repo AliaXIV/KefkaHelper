@@ -84,6 +84,7 @@ public class MainWindow : Window, IDisposable
             });
 
         }
+        ImGui.SameLine();
         if (ImGui.Button("Mark Accretion"))
         {
             var list = _blackholePartyData
@@ -102,11 +103,6 @@ public class MainWindow : Window, IDisposable
         ImGui.EndGroup();
 
         ImGui.Separator();
-
-        if (ImGui.Button("Log statuses"))
-        {
-            plugin.LogDebuffStatuses();
-        }
 
         if (ImGui.Button("Debug assignment"))
         {

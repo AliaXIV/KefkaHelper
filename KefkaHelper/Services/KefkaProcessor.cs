@@ -32,7 +32,6 @@ public class KefkaProcessor : IDisposable
     private const uint ActionIdEarthquake1 = 50545;
     private const uint ActionIdEarthquake2 = 50546;
 
-
     private const int StatusIdForsakenStack = 5084;
     private const int StatusIdForsakenCircle = 5085;
     private const int StatusIdForsakenCone = 5086;
@@ -46,8 +45,7 @@ public class KefkaProcessor : IDisposable
     private Plugin _plugin;
     private ExcelSheet<Lumina.Excel.Sheets.Action> _actionSheet;
     private List<(DateTime when, Action handler)> _scheduledActions = new();
-
-
+    
     public bool IsForsakenEnabled { get; private set; }
 
     public KefkaProcessor(Plugin plugin)
