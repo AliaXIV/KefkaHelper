@@ -11,7 +11,9 @@ using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Game.Network;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using Lumina.Excel;
+using Lumina.Excel.Sheets;
 using Lumina.Text;
+using Serilog;
 
 namespace KefkaHelper.Services;
 
@@ -40,12 +42,11 @@ public class KefkaProcessor : IDisposable
     private const uint NpcBaseIdKefkaP2Clone = 19513;
 
     public Dictionary<int, PlayerMarker>? CachedBlackholeMarkers;
-    public event Action<Dictionary<int, PlayerMarker>> OnBlackholeMarkersUpdated;
-    
+    public event Action<Dictionary<int, PlayerMarker>>? OnBlackholeMarkersUpdated;
+
     private Plugin _plugin;
     private ExcelSheet<Lumina.Excel.Sheets.Action> _actionSheet;
-    private List<(DateTime when, Action handler)> _scheduledActions = new();
-    
+
     public bool IsForsakenEnabled { get; private set; }
 
     public KefkaProcessor(Plugin plugin)
@@ -56,28 +57,18 @@ public class KefkaProcessor : IDisposable
 
         Plugin.Framework.Update += Update;
         _plugin.BattleProcessor.OnActorCast += HandleActorCast;
+        _plugin.BattleProcessor.OnActorStatusEffectChange += HandleActorStatusEffectChange;
     }
-
 
     public void Dispose()
     {
         Plugin.Framework.Update -= Update;
         _plugin.BattleProcessor.OnActorCast -= HandleActorCast;
+        _plugin.BattleProcessor.OnActorStatusEffectChange -= HandleActorStatusEffectChange;
     }
 
     private void Update(IFramework framework)
     {
-        var now = DateTime.UtcNow;
-        for (var i = _scheduledActions.Count - 1; i >= 0; i--)
-        {
-            var action = _scheduledActions[i];
-            if (now > action.when)
-            {
-                action.handler.Invoke();
-                _scheduledActions.RemoveAt(i);
-            }
-        }
-
         if (IsForsakenEnabled)
         {
             CheckForsaken();
@@ -86,42 +77,105 @@ public class KefkaProcessor : IDisposable
 
     private void HandleActorCast(uint sourceId, ActorCastPacket data)
     {
-
-        var obj = Plugin.ObjectTable.SearchById(sourceId);
-        if (obj is {ObjectKind: ObjectKind.BattleNpc})
-        {
-            Plugin.Log.Info(
-                $"[cast] {obj.Name.TextValue} {_actionSheet.GetRow(data.ActionId).Name.ExtractText()} sourceBaseId: {obj.BaseId} castId: {data.ActionId} castTime: {data.CastTime}");
-        }
-
+        // var obj = Plugin.ObjectTable.SearchById(sourceId);
+        // if (obj is {ObjectKind: ObjectKind.BattleNpc})
+        // {
+        //     Plugin.Log.Info(
+        //         $"[cast] {obj.Name.TextValue} {_actionSheet.GetRow(data.ActionId).Name.ExtractText()} sourceBaseId: {obj.BaseId} castId: {data.ActionId} castTime: {data.CastTime}");
+        // }
         if (IsForsakenEnabled)
         {
             if (data.ActionId is ActionIdPastEnd or ActionIdFutureEnd)
             {
-                var action = _actionSheet.GetRow(data.ActionId);
                 _plugin.ForsakenWindow.LastEndCastId = data.ActionId;
 
-                var message = new SeStringBuilder()
-                              .PushColorRgba(new Vector4(0.9f, 0.1f, 0.8f, 1.0f))
-                              .Append(action.Name)
-                              .PopColor()
-                              .ToReadOnlySeString();
-                Plugin.ChatGui.Print(message);
+                if (_plugin.Configuration.ForsakenPastFutureMessages)
+                {
+
+                    var action = _actionSheet.GetRow(data.ActionId);
+                    var message = new SeStringBuilder()
+                                  .PushColorRgba(new Vector4(0.9f, 0.1f, 0.8f, 1.0f))
+                                  .Append(action.Name)
+                                  .PopColor()
+                                  .ToReadOnlySeString();
+                    Plugin.ChatGui.Print(message);
+                }
             }
         }
 
         if (data.ActionId == ActionIdEarthquake1)
         {
-            DoAfter(
-                data.CastTime + 5.0f,
+            Plugin.Framework.RunOnTick(
                 () =>
                 {
                     CachedBlackholeMarkers = GetBlackholeMarkers();
                     OnBlackholeMarkersUpdated?.Invoke(CachedBlackholeMarkers);
-                    Plugin.ChatGui.Print("Blackhole ready");
-                    Plugin.Log.Info("Blackhole ready");
-                });
+                    Plugin.ChatGui.Print("Blackhole assignment ready");
+                    Plugin.Framework.RunOnTick(
+                        () =>
+                        {
+                            switch (_plugin.Configuration.BlackHoleAutomarkerMode)
+                            {
+                                case Configuration.BlackholeAutomarkerMode.AccretionOnly:
+                                    Plugin.Log.Debug("AM marking accretion only");
+                                    _plugin.MarkerManager.MarkMultipleStaggered(
+                                        CachedBlackholeMarkers
+                                            .Where(m => m.Value is PlayerMarker.Ignore1 or PlayerMarker.Ignore2)
+                                            .Select(pair => (pair.Key, pair.Value))
+                                            .ToArray(),
+                                        _plugin.Configuration.BlackholeAutomarkerStagger
+                                    );
+                                    break;
+                                case Configuration.BlackholeAutomarkerMode.All:
+                                    Plugin.Log.Debug("AM marking all");
+                                    _plugin.MarkerManager.MarkMultipleStaggered(
+                                        CachedBlackholeMarkers
+                                            .Select(pair => (pair.Key, pair.Value))
+                                            .ToArray(),
+                                        _plugin.Configuration.BlackholeAutomarkerStagger
+                                    );
+                                    break;
+                                case Configuration.BlackholeAutomarkerMode.Disabled:
+                                default:
+                                    break;
+                            }
+                        },
+                        TimeSpan.FromSeconds(_plugin.Configuration.BlackholeAutomarkerDelay));
+                },
+                TimeSpan.FromSeconds(data.CastTime + 4.0f)
+            );
+
         }
+    }
+
+    private void HandleActorStatusEffectChange(uint entityId, BattleProcessor.StatusChange change, BattleProcessor.StatusData status)
+    {
+        // TODO: handle debuff here instead of separate loop 
+
+        // var playerIndex = Plugin.OrderedPartyList.FindIndex(m => m.EntityId == entityId);
+        // if (playerIndex < 0)
+        // {
+        //     return;
+        // }
+        // if (Plugin.PlayerState.EntityId == entityId)
+        // {
+        //     // var statusData = Plugin.DataManager.GetExcelSheet<Status>().GetRow(status.StatusId);
+        //     // Plugin.Log.Debug($"[status] entityId:{entityId}, change:{change.ToString()} status:{status.StatusId}:{statusData.Name.ToString()} stacks:{status.Status.Param} time:{status.Status.RemainingTime}");
+        //
+        //     // if its spells trouble then we either show or hide window
+        //     // var isForsakenDebuff = status.StatusId is StatusIdForsakenStack or StatusIdForsakenCircle or StatusIdForsakenCone;
+        //     // if (isForsakenDebuff)
+        //     // {
+        //     //     if (change == BattleProcessor.StatusChange.Added)
+        //     //     {
+        //     //         _plugin.ForsakenWindow.IsForsakenActive = true;
+        //     //
+        //     //         
+        //     //     }
+        //     //     else if (change == BattleProcessor.StatusChange.Removed) { }
+        //     //
+        //     // }
+        // }
     }
 
 
@@ -203,13 +257,6 @@ public class KefkaProcessor : IDisposable
 
     public void SetForsakenEnabled(bool enabled)
     {
-
         IsForsakenEnabled = enabled;
-    }
-
-    private void DoAfter(float after, Action action)
-    {
-        var when = DateTime.UtcNow.AddSeconds(after);
-        _scheduledActions.Add((when, action));
     }
 }

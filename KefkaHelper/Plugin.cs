@@ -1,21 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Dalamud.Game.Command;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using System.Linq;
-using System.Text;
 using Dalamud.Game.ClientState.Party;
 using Dalamud.Game.ClientState.Statuses;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
-using FFXIVClientStructs.FFXIV.Client.UI;
-using FFXIVClientStructs.FFXIV.Client.UI.Info;
 using KefkaHelper.Windows;
 using KefkaHelper.Services;
-using Action = Lumina.Excel.Sheets.Action;
 
 namespace KefkaHelper;
 
@@ -44,8 +38,11 @@ public sealed class Plugin : IDalamudPlugin
     internal static IPluginLog Log { get; private set; } = null!;
     [PluginService]
     internal static IGameInteropProvider GameInteropProvider { get; private set; } = null!;
-
-
+    [PluginService]
+    internal static IPlayerState PlayerState { get; private set; } = null!;
+    [PluginService]
+    internal static IClientState ClientState { get; private set; } = null!;
+    
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("KefkaHelper");
@@ -60,26 +57,6 @@ public sealed class Plugin : IDalamudPlugin
     public readonly BattleProcessor BattleProcessor;
 
     public static List<IPartyMember> OrderedPartyList => GetOrderedPartyList();
-
-    private static readonly Dictionary<string, int> PartyOrderSymbolMapping = new()
-    {
-        {"E090", 1},
-        {"E091", 2},
-        {"E092", 3},
-        {"E093", 4},
-        {"E094", 5},
-        {"E095", 6},
-        {"E096", 7},
-        {"E097", 8},
-        {"E0E0", 1},
-        {"E0E1", 2},
-        {"E0E2", 3},
-        {"E0E3", 4},
-        {"E0E4", 5},
-        {"E0E5", 6},
-        {"E0E6", 7},
-        {"E0E7", 8},
-    };
 
     public Plugin()
     {
@@ -96,19 +73,23 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(MainWindow);
         WindowSystem.AddWindow(ForsakenWindow);
 
-        CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand));
+        CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
+        {
+            HelpMessage = "Opens main window of the plugin, as of now it contains blackhole data"
+        });
 
-        PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
+    PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
         Configuration.OnChanged += ConfigurationOnChanged;
         ConfigurationOnChanged();
+        
     }
 
     private void ConfigurationOnChanged()
     {
-        KefkaProcessor.SetForsakenEnabled(Configuration.IsDisplayForsakenDebuffs);
+        KefkaProcessor.SetForsakenEnabled(Configuration.ForsakenDisplayDebuffs);
     }
 
     public void Dispose()

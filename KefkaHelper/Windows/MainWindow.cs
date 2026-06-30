@@ -98,12 +98,9 @@ public class MainWindow : Window, IDisposable
             });
 
         }
-
-
+        
         ImGui.EndGroup();
-
         ImGui.Separator();
-
         if (ImGui.Button("Debug assignment"))
         {
             DebugBlackhole();

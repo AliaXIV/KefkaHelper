@@ -15,7 +15,7 @@ public class ForsakenWindow : Window, IDisposable
     public uint? LastEndCastId = null;
     public bool IsPreview = false;
 
-    private ExcelSheet<Lumina.Excel.Sheets.Action> ActionSheet;
+    private ExcelSheet<Lumina.Excel.Sheets.Action> _actionSheet;
 
     public ForsakenWindow(Plugin plugin) : base("Forsaken###KefkaForsaken")
     {
@@ -25,7 +25,7 @@ public class ForsakenWindow : Window, IDisposable
         Size = new Vector2(120, 120);
         SizeCondition = ImGuiCond.Always;
 
-        ActionSheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>();
+        _actionSheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>();
     }
 
     public void Dispose() { }
@@ -33,18 +33,18 @@ public class ForsakenWindow : Window, IDisposable
     public override void Draw()
     {
         const uint spellsTroubleIconId = 218951;
-        
+
         var iconId = IsForsakenActive ? GetIconForForsaken(Mechanic) : spellsTroubleIconId;
-        var castName = LastEndCastId.HasValue ? ActionSheet.GetRow(LastEndCastId.Value).Name.ExtractText() : "---";
-        
+        var castName = LastEndCastId.HasValue ? _actionSheet.GetRow(LastEndCastId.Value).Name.ExtractText() : "---";
+
         var texture = Plugin.TextureProvider.GetFromGameIcon(new GameIconLookup(iconId, true))
                             .GetWrapOrEmpty();
         var availableWidth = ImGui.GetContentRegionAvail().X;
-        
+
         var iconOffset = (availableWidth - texture.Width) / 2;
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + iconOffset);
         ImGui.Image(texture.Handle, texture.Size);
-        
+
         var textSize = ImGui.CalcTextSize(castName);
         var textOffset = (availableWidth - textSize.X) / 2;
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + textOffset);
@@ -64,5 +64,19 @@ public class ForsakenWindow : Window, IDisposable
             ForsakenMechanicType.Cone => 215967,
             _ => 218951
         };
+    }
+
+    public void TogglePreview()
+    {
+        if (IsOpen)
+        {
+            IsOpen = false;
+            IsPreview = false;
+        }
+        else
+        {
+            IsOpen = true;
+            IsPreview = true;
+        }
     }
 }

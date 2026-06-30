@@ -2,7 +2,7 @@
   "Author": "AliaXIV",
   "Name": "Kefka Helper",
   "Punchline": "Helper plugin assisting with some of DMU/UMAD/Kefka Ultimate mechanics",
-  "Description": "TBA",
+  "Description": "As of now allows display of a forsaken debuff + chat notifications for past/future as well as automarking for P3 Blackhole",
   "ApplicableVersion": "any",
   "Tags": [
     "ultimate",
